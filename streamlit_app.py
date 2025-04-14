@@ -1,55 +1,30 @@
 import streamlit as st
 from datetime import datetime
-import json, requests
-import subprocess, time, atexit
+import json
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from threading import Thread
 from pathlib import Path
 
-# 페이지 설정 (반드시 첫 번째 Streamlit 명령어여야 함)
+# 페이지 설정
 st.set_page_config(
     page_title='간단한 게시판',
     page_icon='📝'
 )
 
-# Flask API URL 설정
-API_URL = "http://localhost:5000"
-
-# Flask 서버 관리
-@st.cache_resource
-def start_flask_server():
-    """Flask 서버를 백그라운드로 실행"""
-    try:
-        requests.get(f"{API_URL}/api/posts")
-        return None
-    except requests.RequestException:
-        process = subprocess.Popen(['python', 'api_server.py'])
-        for _ in range(5):
-            time.sleep(1)
-            try:
-                requests.get(f"{API_URL}/api/posts")
-                break
-            except requests.RequestException:
-                continue
-        atexit.register(lambda: process.terminate())
-        return process
-
-# Flask 서버 시작
-flask_process = start_flask_server()
-
-from pathlib import Path
-
-@st.cache_data
-def load_posts_from_api():
-    try:
-        response = requests.get(f"{API_URL}/api/posts")
-        return response.json()
-    except requests.RequestException:
-        st.error("API 서버에 연결할 수 없습니다. Flask 서버가 실행 중인지 확인해주세요.")
-        return {"posts": []}
+# FastAPI 앱 설정
+api = FastAPI()
+api.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # JSON 파일 경로 설정
 POSTS_FILE = Path(__file__).parent / 'data/posts.json'
 
-# JSON 파일 읽기/쓰기 함수
 def load_posts():
     if not POSTS_FILE.exists():
         return {"posts": []}
@@ -59,8 +34,28 @@ def save_posts(posts_data):
     POSTS_FILE.parent.mkdir(exist_ok=True)
     POSTS_FILE.write_text(json.dumps(posts_data, ensure_ascii=False, indent=4), encoding='utf-8')
 
-# 게시물 데이터 로드
-posts_data = load_posts_from_api()
+# FastAPI 라우트
+@api.get("/api/posts")
+async def get_posts():
+    return load_posts()
+
+@api.get("/api/posts/{date}")
+async def get_posts_by_date(date: str):
+    posts = load_posts()
+    filtered_posts = {
+        "posts": [post for post in posts["posts"] if post["date"] == date]
+    }
+    return filtered_posts
+
+# FastAPI 서버 시작 함수
+def run_api():
+    uvicorn.run(api, host="0.0.0.0", port=8000)
+
+# API 서버 백그라운드 실행
+Thread(target=run_api, daemon=True).start()
+
+# Streamlit 앱 코드
+posts_data = load_posts()
 
 # 헤더 섹션 수정
 st.title('📝 간단한 게시판')
@@ -98,10 +93,11 @@ else:
     st.header('🔍 JSON 데이터 뷰어', divider='gray')
     
     # API 정보 표시
-    st.info("""
+    API_BASE_URL = "http://localhost:8000"
+    st.info(f"""
     다음 API 엔드포인트를 통해 데이터에 접근할 수 있습니다:
-    - 전체 게시물: http://localhost:5000/api/posts
-    - 날짜별 게시물: http://localhost:5000/api/posts/<날짜>
+    - 전체 게시물: {API_BASE_URL}/api/posts
+    - 날짜별 게시물: {API_BASE_URL}/api/posts/<날짜>
     """)
     
     try:
