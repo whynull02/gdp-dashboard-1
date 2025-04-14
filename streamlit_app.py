@@ -1,17 +1,29 @@
 import streamlit as st
 from datetime import datetime
-import json
+import json, requests
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from threading import Thread
 from pathlib import Path
+import time, socket
+import threading
 
 # 페이지 설정
 st.set_page_config(
     page_title='간단한 게시판',
     page_icon='📝'
 )
+
+# API 설정
+API_PORT = 8000
+API_BASE_URL = f"http://localhost:{API_PORT}"
+server_started = False
+
+# 포트 사용 가능 여부 확인 함수
+def is_port_in_use(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
 
 # FastAPI 앱 설정
 api = FastAPI()
@@ -47,12 +59,33 @@ async def get_posts_by_date(date: str):
     }
     return filtered_posts
 
-# FastAPI 서버 시작 함수
-def run_api():
-    uvicorn.run(api, host="0.0.0.0", port=8000)
+# API 서버 시작 함수 수정
+def start_api_server():
+    global server_started
+    if not server_started:
+        try:
+            uvicorn.run(api, host="0.0.0.0", port=API_PORT, log_level="error")
+            server_started = True
+        except Exception as e:
+            st.error(f"API 서버 시작 실패: {str(e)}")
 
-# API 서버 백그라운드 실행
-Thread(target=run_api, daemon=True).start()
+# API 서버 상태 확인
+def check_api_server():
+    try:
+        response = requests.get(f"{API_BASE_URL}/api/posts")
+        return response.status_code == 200
+    except:
+        return False
+
+# API 서버 시작
+if not check_api_server():
+    api_thread = threading.Thread(target=start_api_server, daemon=True)
+    api_thread.start()
+    # 서버 시작 대기
+    for _ in range(5):
+        if check_api_server():
+            break
+        time.sleep(1)
 
 # Streamlit 앱 코드
 posts_data = load_posts()
@@ -90,78 +123,160 @@ if page == '게시판':
         with st.expander(f"#{post['id']} {post['title']} ({post['date']})"):
             st.write(post['content'])
 else:
-    st.header('🔍 JSON 데이터 뷰어', divider='gray')
-    
-    # API 문서 섹션 업데이트
-    st.header('API 문서', divider='gray')
+    st.header('🔍 API 문서', divider='gray')
     API_BASE_URL = "http://localhost:8000"
     
-    st.markdown("""
-    ### REST API 엔드포인트
+    # API 테스트 섹션 추가
+    st.header("API 테스트", divider="gray")
+    test_tabs = st.tabs(["GET", "POST", "PUT", "DELETE"])
     
-    #### 1. 전체 게시물 조회
-    ```
+    with test_tabs[0]:
+        st.markdown("### GET 테스트")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            get_url = f"{API_BASE_URL}/api/posts"
+            st.code(get_url)
+        with col2:
+            if st.button("GET 테스트", key="get_test"):
+                try:
+                    response = requests.get(get_url, timeout=5)  # 타임아웃 추가
+                    if response.status_code == 200:
+                        st.json(response.json())
+                    else:
+                        st.error(f"API 오류: {response.status_code}")
+                except requests.RequestException as e:
+                    st.error(f"API 서버 연결 실패: {str(e)}")
+    
+    with test_tabs[1]:
+        st.markdown("### POST 테스트")
+        with st.form("post_test"):
+            test_title = st.text_input("제목")
+            test_content = st.text_area("내용")
+            if st.form_submit_button("POST 테스트"):
+                try:
+                    response = requests.post(
+                        f"{API_BASE_URL}/api/posts",
+                        json={"title": test_title, "content": test_content}
+                    )
+                    st.json(response.json())
+                except:
+                    st.error("API 서버 연결 실패")
+    
+    with test_tabs[2]:
+        st.markdown("### PUT 테스트")
+        with st.form("put_test"):
+            post_id = st.number_input("게시물 ID", min_value=1, step=1)
+            test_title = st.text_input("새 제목")
+            test_content = st.text_area("새 내용")
+            if st.form_submit_button("PUT 테스트"):
+                try:
+                    response = requests.put(
+                        f"{API_BASE_URL}/api/posts/{post_id}",
+                        json={"title": test_title, "content": test_content}
+                    )
+                    st.json(response.json())
+                except:
+                    st.error("API 서버 연결 실패")
+    
+    with test_tabs[3]:
+        st.markdown("### DELETE 테스트")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            delete_id = st.number_input("삭제할 게시물 ID", min_value=1, step=1)
+        with col2:
+            if st.button("DELETE 테스트"):
+                try:
+                    response = requests.delete(f"{API_BASE_URL}/api/posts/{delete_id}")
+                    st.success("게시물이 삭제되었습니다")
+                except:
+                    st.error("API 서버 연결 실패")
+    
+    # 기존 API 문서 표시
+    st.header("API 문서", divider="gray")
+    
+    st.markdown("""
+    ### REST API 엔드포인트 문서
+
+    #### 1. 게시물 조회 API
+    1) 전체 게시물 목록
+    ```http
     GET /api/posts
     ```
-    응답 예시:
-    ```json
-    {
-        "posts": [
-            {
-                "id": 1,
-                "title": "제목",
-                "content": "내용",
-                "date": "2024-01-01"
-            }
-        ]
-    }
-    ```
     
-    #### 2. 날짜별 게시물 조회
+    2) 특정 게시물 조회
+    ```http
+    GET /api/posts/{post_id}
     ```
-    GET /api/posts/{date}
-    ```
-    - `date`: YYYY-MM-DD 형식 (예: 2024-01-01)
-    
-    #### 3. 게시물 작성
-    ```
+
+    #### 2. 게시물 생성 API
+    ```http
     POST /api/posts
     Content-Type: application/json
-    
+
     {
-        "title": "제목",
-        "content": "내용"
+        "title": "게시물 제목",
+        "content": "게시물 내용"
     }
     ```
-    
-    #### 4. Python 사용 예시
+
+    #### 3. 게시물 수정 API
+    ```http
+    PUT /api/posts/{post_id}
+    Content-Type: application/json
+
+    {
+        "title": "수정된 제목",
+        "content": "수정된 내용"
+    }
+    ```
+
+    #### 4. 게시물 삭제 API
+    ```http
+    DELETE /api/posts/{post_id}
+    ```
+
+    ### 코드 예시
+
+    #### Python
     ```python
     import requests
-    
+
     # 전체 게시물 조회
     response = requests.get(f"{API_BASE_URL}/api/posts")
     posts = response.json()
-    
-    # 특정 날짜 게시물 조회
-    date = "2024-01-01"
-    response = requests.get(f"{API_BASE_URL}/api/posts/{date}")
-    filtered_posts = response.json()
-    
+
+    # 특정 게시물 조회
+    post_id = 1
+    response = requests.get(f"{API_BASE_URL}/api/posts/{post_id}")
+    post = response.json()
+
     # 새 게시물 작성
-    data = {
+    new_post = {
         "title": "새 게시물",
         "content": "내용입니다"
     }
-    response = requests.post(f"{API_BASE_URL}/api/posts", json=data)
+    response = requests.post(f"{API_BASE_URL}/api/posts", json=new_post)
+
+    # 게시물 수정
+    update_data = {
+        "title": "수정된 제목",
+        "content": "수정된 내용"
+    }
+    response = requests.put(f"{API_BASE_URL}/api/posts/{post_id}", json=update_data)
+
+    # 게시물 삭제
+    response = requests.delete(f"{API_BASE_URL}/api/posts/{post_id}")
     ```
-    
-    #### 5. JavaScript 사용 예시
+
+    #### JavaScript/Fetch
     ```javascript
+    const API_BASE_URL = 'http://localhost:8000';
+
     // 전체 게시물 조회
     fetch(`${API_BASE_URL}/api/posts`)
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => console.log(data));
-    
+
     // 새 게시물 작성
     fetch(`${API_BASE_URL}/api/posts`, {
         method: 'POST',
@@ -173,6 +288,33 @@ else:
             content: "내용입니다"
         })
     });
+
+    // 게시물 수정
+    fetch(`${API_BASE_URL}/api/posts/1`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: "수정된 제목",
+            content: "수정된 내용"
+        })
+    });
+
+    // 게시물 삭제
+    fetch(`${API_BASE_URL}/api/posts/1`, {
+        method: 'DELETE'
+    });
+    ```
+
+    ### API 응답 형식
+    ```json
+    {
+        "id": 1,
+        "title": "게시물 제목",
+        "content": "게시물 내용",
+        "date": "2024-01-01"
+    }
     ```
     """)
     

@@ -1,15 +1,47 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from pathlib import Path
 import json
 from datetime import datetime
 
+class Post(BaseModel):
+    title: str
+    content: str
+    date: Optional[str] = None
+
+class PostResponse(Post):
+    id: int
+
+class PostList(BaseModel):
+    posts: List[PostResponse] = Field(
+        description="게시물 목록",
+        example=[{
+            "id": 1,
+            "title": "첫 번째 게시물",
+            "content": "내용입니다",
+            "date": "2024-01-01"
+        }]
+    )
+
 app = FastAPI(
     title="게시판 API",
-    description="게시판 데이터를 위한 REST API",
-    version="1.0.0"
+    description="""
+    # 게시판 REST API 문서
+    
+    ## 기능
+    - 게시물 조회/생성/수정/삭제
+    - 날짜별 게시물 필터링
+    
+    ## 사용방법
+    각 엔드포인트의 세부 설명을 확인하세요.
+    """,
+    version="1.0.0",
+    docs_url=None,
+    redoc_url="/api/docs"
 )
 
 # CORS 설정
@@ -19,15 +51,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# 데이터 모델
-class Post(BaseModel):
-    title: str
-    content: str
-    date: Optional[str] = None
-
-class PostResponse(Post):
-    id: int
 
 # JSON 파일 경로 설정
 POSTS_FILE = Path(__file__).parent / 'data/posts.json'
@@ -43,11 +66,29 @@ def save_posts(posts_data):
     POSTS_FILE.write_text(json.dumps(posts_data, ensure_ascii=False, indent=4), encoding='utf-8')
 
 # API 엔드포인트
-@app.get("/api/posts", response_model=List[PostResponse], tags=["posts"])
+@app.get("/api/posts", response_model=PostList, tags=["posts"])
 async def get_posts():
-    """모든 게시물을 조회합니다."""
-    posts = load_posts()
-    return posts["posts"]
+    """
+    ### 전체 게시물 목록을 조회합니다.
+    
+    Returns:
+        PostList: 게시물 목록이 담긴 객체
+    
+    Example:
+        ```json
+        {
+            "posts": [
+                {
+                    "id": 1,
+                    "title": "게시물 제목",
+                    "content": "내용",
+                    "date": "2024-01-01"
+                }
+            ]
+        }
+        ```
+    """
+    return load_posts()
 
 @app.get("/api/posts/{post_id}", response_model=PostResponse, tags=["posts"])
 async def get_post(post_id: int):
@@ -90,6 +131,15 @@ async def delete_post(post_id: int):
     posts["posts"] = [p for p in posts["posts"] if p["id"] != post_id]
     save_posts(posts)
     return {"message": "게시물이 삭제되었습니다"}
+
+@app.get("/", include_in_schema=False)
+async def custom_swagger_ui_html():
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="게시판 API 문서",
+        swagger_js_url="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js",
+        swagger_css_url="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css",
+    )
 
 if __name__ == "__main__":
     import uvicorn
