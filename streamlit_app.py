@@ -1,151 +1,77 @@
 import streamlit as st
-import pandas as pd
-import math
 from pathlib import Path
 
-# Set the title and favicon that appear in the Browser's tab bar.
+# 페이지 설정
 st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
+    page_title='My Profile',
+    page_icon=':smile:', 
 )
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# 헤더 섹션
+st.title('👋 안녕하세요!')
+st.subheader('제 개인 웹사이트에 오신 것을 환영합니다')
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+# 프로필 섹션
+col1, col2 = st.columns([1, 2])
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+with col1:
+    st.image('https://via.placeholder.com/200', caption='프로필 사진')
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+with col2:
+    st.markdown("""
+    ### 기본 정보
+    - 이름: 홍길동
+    - 직업: 소프트웨어 엔지니어
+    - 위치: 서울, 대한민국
+    """)
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+# 소개 섹션
+st.header('자기소개', divider='gray')
+st.write("""
+저는 웹 개발을 전문으로 하는 소프트웨어 엔지니어입니다.
+새로운 기술을 배우고 적용하는 것을 좋아하며, 
+특히 사용자 경험을 개선하는 일에 관심이 많습니다.
+""")
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
-
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
-
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
+# 기술 스택
+st.header('기술 스택', divider='gray')
 cols = st.columns(4)
 
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
+skills = {
+    'Python': 90,
+    'JavaScript': 85,
+    'HTML/CSS': 80,
+    'React': 75
+}
 
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
+for i, (skill, level) in enumerate(skills.items()):
+    with cols[i]:
+        st.metric(label=skill, value=f'{level}%')
 
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
+# 연락처
+st.header('연락처', divider='gray')
+st.markdown("""
+- 📧 Email: example@email.com
+- 💼 LinkedIn: linkedin.com/in/username
+- 📱 GitHub: github.com/username
+""")
 
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+# 프로젝트 갤러리
+st.header('주요 프로젝트', divider='gray')
+proj_col1, proj_col2 = st.columns(2)
+
+with proj_col1:
+    with st.expander("프로젝트 1", expanded=True):
+        st.markdown("""
+        웹 애플리케이션 개발 프로젝트입니다.
+        - 사용 기술: Python, React
+        - 주요 기능: 사용자 인증, 데이터 시각화
+        """)
+
+with proj_col2:
+    with st.expander("프로젝트 2", expanded=True):
+        st.markdown("""
+        데이터 분석 프로젝트입니다.
+        - 사용 기술: Python, Pandas
+        - 주요 기능: 데이터 전처리, 통계 분석
+        """)
