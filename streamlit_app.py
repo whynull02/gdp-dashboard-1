@@ -92,12 +92,88 @@ if page == '게시판':
 else:
     st.header('🔍 JSON 데이터 뷰어', divider='gray')
     
-    # API 정보 표시
+    # API 문서 섹션 업데이트
+    st.header('API 문서', divider='gray')
     API_BASE_URL = "http://localhost:8000"
-    st.info(f"""
-    다음 API 엔드포인트를 통해 데이터에 접근할 수 있습니다:
-    - 전체 게시물: {API_BASE_URL}/api/posts
-    - 날짜별 게시물: {API_BASE_URL}/api/posts/<날짜>
+    
+    st.markdown("""
+    ### REST API 엔드포인트
+    
+    #### 1. 전체 게시물 조회
+    ```
+    GET /api/posts
+    ```
+    응답 예시:
+    ```json
+    {
+        "posts": [
+            {
+                "id": 1,
+                "title": "제목",
+                "content": "내용",
+                "date": "2024-01-01"
+            }
+        ]
+    }
+    ```
+    
+    #### 2. 날짜별 게시물 조회
+    ```
+    GET /api/posts/{date}
+    ```
+    - `date`: YYYY-MM-DD 형식 (예: 2024-01-01)
+    
+    #### 3. 게시물 작성
+    ```
+    POST /api/posts
+    Content-Type: application/json
+    
+    {
+        "title": "제목",
+        "content": "내용"
+    }
+    ```
+    
+    #### 4. Python 사용 예시
+    ```python
+    import requests
+    
+    # 전체 게시물 조회
+    response = requests.get(f"{API_BASE_URL}/api/posts")
+    posts = response.json()
+    
+    # 특정 날짜 게시물 조회
+    date = "2024-01-01"
+    response = requests.get(f"{API_BASE_URL}/api/posts/{date}")
+    filtered_posts = response.json()
+    
+    # 새 게시물 작성
+    data = {
+        "title": "새 게시물",
+        "content": "내용입니다"
+    }
+    response = requests.post(f"{API_BASE_URL}/api/posts", json=data)
+    ```
+    
+    #### 5. JavaScript 사용 예시
+    ```javascript
+    // 전체 게시물 조회
+    fetch(`${API_BASE_URL}/api/posts`)
+        .then(response => response.json())
+        .then(data => console.log(data));
+    
+    // 새 게시물 작성
+    fetch(`${API_BASE_URL}/api/posts`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: "새 게시물",
+            content: "내용입니다"
+        })
+    });
+    ```
     """)
     
     try:
