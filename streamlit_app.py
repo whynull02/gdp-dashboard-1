@@ -138,8 +138,9 @@ st.title('📝 간단한 게시판')
 st.info("""
 ## 🌐 API 접근 URL
 데이터를 JSON 형식으로 받아보실 수 있습니다:
-```
-https://gdp-dashboard-6l4nu6gox2c.streamlit.app/api/posts
+
+- JSON 뷰어 페이지: `/json_viewer`
+- API 엔드포인트: `/api/posts`
 ```
 """)
 
