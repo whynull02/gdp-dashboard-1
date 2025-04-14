@@ -64,6 +64,7 @@ def start_api_server():
     global server_started
     if not server_started:
         try:
+            # 외부 접속을 위한 host 설정
             uvicorn.run(api, host="0.0.0.0", port=API_PORT, log_level="error")
             server_started = True
         except Exception as e:
@@ -124,9 +125,21 @@ if page == '게시판':
             st.write(post['content'])
 else:
     st.header('🔍 API 문서', divider='gray')
-    API_BASE_URL = "http://localhost:8000"
     
-    # API 테스트 섹션 추가
+    # API URL 설정 추가
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        server_ip = st.text_input("서버 IP 주소", "localhost")
+        API_BASE_URL = f"http://{server_ip}:8000"
+    with col2:
+        st.markdown("### 서버 상태")
+        try:
+            response = requests.get(f"{API_BASE_URL}/api/posts")
+            st.success("연결됨")
+        except:
+            st.error("연결 안됨")
+    
+    # API 테스트 섹션
     st.header("API 테스트", divider="gray")
     test_tabs = st.tabs(["GET", "POST", "PUT", "DELETE"])
     
@@ -136,11 +149,18 @@ else:
         with col1:
             get_url = f"{API_BASE_URL}/api/posts"
             st.code(get_url)
+            st.markdown("""
+            외부 접속 방법:
+            ```bash
+            curl -X GET {get_url}
+            ```
+            """)
         with col2:
             if st.button("GET 테스트", key="get_test"):
                 try:
-                    response = requests.get(get_url, timeout=5)  # 타임아웃 추가
+                    response = requests.get(get_url, timeout=5)
                     if response.status_code == 200:
+                        st.success("성공!")
                         st.json(response.json())
                     else:
                         st.error(f"API 오류: {response.status_code}")
@@ -340,3 +360,13 @@ else:
 
     except json.JSONDecodeError:
         st.error("JSON 파일 형식이 올바르지 않습니다.")
+
+# API 문서에 외부 접속 정보 추가
+st.info("""
+### 외부 접속 정보
+- API 서버: `http://<서버IP>:8000/api/posts`
+- API 문서: `http://<서버IP>:8000/docs`
+- ReDoc 문서: `http://<서버IP>:8000/redoc`
+
+주의: <서버IP>는 실제 서버의 IP 주소로 변경하세요.
+""")

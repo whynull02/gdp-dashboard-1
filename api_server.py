@@ -27,27 +27,26 @@ class PostList(BaseModel):
         }]
     )
 
+# CORS 설정 업데이트
+origins = [
+    "http://localhost",
+    "http://localhost:8501",
+    "http://localhost:8000",
+    "*"  # 모든 도메인 허용
+]
+
 app = FastAPI(
     title="게시판 API",
-    description="""
-    # 게시판 REST API 문서
-    
-    ## 기능
-    - 게시물 조회/생성/수정/삭제
-    - 날짜별 게시물 필터링
-    
-    ## 사용방법
-    각 엔드포인트의 세부 설명을 확인하세요.
-    """,
+    description="게시판 데이터를 위한 REST API",
     version="1.0.0",
-    docs_url=None,
-    redoc_url="/api/docs"
+    docs_url="/docs",  # Swagger UI 활성화
+    redoc_url="/redoc"  # ReDoc UI 활성화
 )
 
-# CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -143,4 +142,5 @@ async def custom_swagger_ui_html():
 
 if __name__ == "__main__":
     import uvicorn
+    # 외부 접속을 위한 host 설정
     uvicorn.run(app, host="0.0.0.0", port=8000)
