@@ -110,6 +110,27 @@ if not check_api_server():
 # Streamlit 앱 코드
 posts_data = load_posts()
 
+# API 설정 수정
+@st.cache_data
+def get_json_data():
+    """JSON 데이터를 직접 반환하는 함수"""
+    return load_posts()
+
+# 직접 JSON 데이터 제공을 위한 함수 추가
+@st.cache_data
+def get_api_data():
+    return load_posts()
+
+# 메인 페이지 시작 전에 API 요청 처리
+if "api" in st.query_params and st.query_params["api"] == "posts":
+    st.json(get_api_data())
+    st.stop()
+
+# Streamlit 라우트 추가
+if 'api/posts' in st.query_params.get('page', ['']):
+    st.write(get_json_data())
+    st.stop()
+
 # 헤더 섹션 수정
 st.title('📝 간단한 게시판')
 
