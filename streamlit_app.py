@@ -8,6 +8,7 @@ from threading import Thread
 from pathlib import Path
 import time, socket
 import threading
+import os
 
 # 페이지 설정
 st.set_page_config(
@@ -15,9 +16,22 @@ st.set_page_config(
     page_icon='📝'
 )
 
+def find_available_port(start_port=8000, max_port=9000):
+    """사용 가능한 포트를 찾습니다."""
+    for port in range(start_port, max_port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('', port))
+                return port
+            except OSError:
+                continue
+    return None
+
 # API 설정
-API_PORT = 8000
-API_BASE_URL = f"http://localhost:{API_PORT}"
+STREAMLIT_URL = "gdp-dashboard-6l4nu6gox2c.streamlit.app"
+API_BASE_URL = f"https://{STREAMLIT_URL}"
+API_PORT = find_available_port() or int(os.getenv("PORT", 8000))
+API_HOST = os.getenv("HOST", "0.0.0.0")
 server_started = False
 
 # 포트 사용 가능 여부 확인 함수
@@ -26,7 +40,11 @@ def is_port_in_use(port):
         return s.connect_ex(('localhost', port)) == 0
 
 # FastAPI 앱 설정
-api = FastAPI()
+api = FastAPI(
+    title="게시판 API",
+    description="게시판 데이터를 위한 REST API",
+    root_path=os.getenv("ROOT_PATH", "")
+)
 api.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -64,11 +82,12 @@ def start_api_server():
     global server_started
     if not server_started:
         try:
-            # 외부 접속을 위한 host 설정
-            uvicorn.run(api, host="0.0.0.0", port=API_PORT, log_level="error")
+            uvicorn.run(api, host=API_HOST, port=API_PORT, log_level="error")
             server_started = True
         except Exception as e:
             st.error(f"API 서버 시작 실패: {str(e)}")
+            return False
+    return True
 
 # API 서버 상태 확인
 def check_api_server():
@@ -93,6 +112,15 @@ posts_data = load_posts()
 
 # 헤더 섹션 수정
 st.title('📝 간단한 게시판')
+
+# API URL 정보 추가
+st.info("""
+## 🌐 API 접근 URL
+데이터를 JSON 형식으로 받아보실 수 있습니다:
+```
+https://gdp-dashboard-6l4nu6gox2c.streamlit.app/api/posts
+```
+""")
 
 # 네비게이션 추가
 st.sidebar.title('메뉴')
@@ -129,8 +157,14 @@ else:
     # API URL 설정 추가
     col1, col2 = st.columns([3, 1])
     with col1:
-        server_ip = st.text_input("서버 IP 주소", "localhost")
-        API_BASE_URL = f"http://{server_ip}:8000"
+        server_url = st.text_input("서버 URL", STREAMLIT_URL)
+        API_BASE_URL = f"https://{server_url}"
+        st.info(f"""
+        ### 현재 API URL:
+        ```
+        {API_BASE_URL}/api/posts
+        ```
+        """)
     with col2:
         st.markdown("### 서버 상태")
         try:
@@ -150,10 +184,21 @@ else:
             get_url = f"{API_BASE_URL}/api/posts"
             st.code(get_url)
             st.markdown("""
-            외부 접속 방법:
+            ### API 테스트 방법
+            
+            1. 터미널에서 실행:
             ```bash
+            # Windows PowerShell
+            curl {get_url}
+            
+            # Linux/Mac Terminal
             curl -X GET {get_url}
             ```
+            
+            2. Postman에서 테스트:
+            - URL 입력: {get_url}
+            - Method: GET
+            - Send 클릭
             """)
         with col2:
             if st.button("GET 테스트", key="get_test"):
@@ -362,11 +407,23 @@ else:
         st.error("JSON 파일 형식이 올바르지 않습니다.")
 
 # API 문서에 외부 접속 정보 추가
-st.info("""
-### 외부 접속 정보
-- API 서버: `http://<서버IP>:8000/api/posts`
-- API 문서: `http://<서버IP>:8000/docs`
-- ReDoc 문서: `http://<서버IP>:8000/redoc`
+st.info(f"""
+### API 접속 정보
+현재 API 서버 URL: `{API_BASE_URL}`
 
-주의: <서버IP>는 실제 서버의 IP 주소로 변경하세요.
+#### API 엔드포인트
+- 전체 게시물: `{API_BASE_URL}/api/posts`
+- 특정 게시물: `{API_BASE_URL}/api/posts/{{id}}`
+- API 문서: `{API_BASE_URL}/docs`
+
+#### 사용 예시 (curl)
+```bash
+# 전체 게시물 조회
+curl {API_BASE_URL}/api/posts
+
+# 새 게시물 작성
+curl -X POST {API_BASE_URL}/api/posts \\
+     -H "Content-Type: application/json" \\
+     -d '{{"title": "제목", "content": "내용"}}'
+```
 """)

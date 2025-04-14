@@ -1,5 +1,5 @@
 streamlit
 fastapi
-uvicorn
+uvicorn[standard]
 python-multipart
 requests

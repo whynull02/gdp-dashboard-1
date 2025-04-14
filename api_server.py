@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -59,6 +59,37 @@ def load_posts():
 def save_posts(posts_data):
     POSTS_FILE.parent.mkdir(exist_ok=True)
     POSTS_FILE.write_text(json.dumps(posts_data, ensure_ascii=False, indent=4), encoding='utf-8')
+
+# HTML 템플릿 추가
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JSON 데이터 뷰어</title>
+    <style>
+        pre { background: #f4f4f4; padding: 20px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>게시판 API 데이터 뷰어</h1>
+    <div id="data"></div>
+    <script>
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/posts');
+                const data = await response.json();
+                document.getElementById('data').innerHTML = `
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        fetchData();
+    </script>
+</body>
+</html>
+"""
 
 # API 엔드포인트
 @app.get("/api/posts", response_model=PostList, tags=["posts"])
@@ -126,6 +157,11 @@ async def delete_post(post_id: int):
     posts["posts"] = [p for p in posts["posts"] if p["id"] != post_id]
     save_posts(posts)
     return {"message": "게시물이 삭제되었습니다"}
+
+@app.get("/view", response_class=HTMLResponse)
+async def view_json():
+    """JSON 데이터를 웹 페이지에서 확인할 수 있는 뷰어를 제공합니다."""
+    return HTMLResponse(content=HTML_TEMPLATE)
 
 @app.get("/", include_in_schema=False)
 async def custom_swagger_ui_html():
