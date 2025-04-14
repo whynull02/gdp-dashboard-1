@@ -28,12 +28,7 @@ class PostList(BaseModel):
     )
 
 # CORS 설정 업데이트
-origins = [
-    "http://localhost",
-    "http://localhost:8501",
-    "http://localhost:8000",
-    "*"  # 모든 도메인 허용
-]
+origins = ["*"]  # 모든 오리진 허용
 
 app = FastAPI(
     title="게시판 API",
@@ -49,6 +44,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # JSON 파일 경로 설정
@@ -142,5 +138,12 @@ async def custom_swagger_ui_html():
 
 if __name__ == "__main__":
     import uvicorn
-    # 외부 접속을 위한 host 설정
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Streamlit Share에서 사용할 포트로 변경
+    PORT = int(os.environ.get("PORT", 8000))
+    uvicorn.run(
+        app, 
+        host="0.0.0.0",
+        port=PORT,
+        proxy_headers=True,
+        forwarded_allow_ips="*"
+    )
