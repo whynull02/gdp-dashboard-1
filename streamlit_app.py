@@ -137,11 +137,7 @@ st.title('📝 간단한 게시판')
 # API URL 정보 추가
 st.info("""
 ## 🌐 API 접근 URL
-다음 두 가지 방법으로 JSON 데이터를 받아볼 수 있습니다:
-
-1. JSON 뷰어 페이지 (권장):
-- JSON 뷰어 페이지: `/json_viewer`
-- API 엔드포인트: `/api/posts`
+JSON 데이터를 직접 받아볼 수 있는 URL:
 ```
 """)
 
